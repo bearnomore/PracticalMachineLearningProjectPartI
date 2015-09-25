@@ -1,0 +1,77 @@
+---
+title: "MachineLearning Project"
+author: "Ye Xu"
+date: "Thursday, September 24, 2015"
+output: html_document
+---
+
+### Backgrounds and Objectives
+Using wearable devices such as Jawbone Up, Nike FuelBand, and Fitbit,it is now possible to collect a large amount of data about personal activity relatively inexpensively. However, people usually focus on quantifying how much of a particular activity they do, but rarely estimating how well they do it. In this project, I will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants from training dataset to predict if they performed barbell lifts correctly and incorrectly in 5 different ways (A-E types of performace). 
+
+### Data input and clean
+First, the training data and test data in csv format were read into R. By exploring the structure of the datasets, we found the original training data had 19622 observations and 160 features, while the testing data had 20 test samples and same 160 features.
+
+```{r, warning=FALSE, message=FALSE}
+library(caret)
+library(knitr)
+
+training <- read.csv('pml-training.csv')
+testing <- read.csv('pml-testing.csv')
+#check the dimentions of the data
+dim(training)
+dim(testing)
+#check the variable names
+names(training)
+names(testing)
+```
+
+Second, the first 7 features of both training and testing data were "housekeeping" tags for observations or test samples and many features were factors or had "NA" as the input. Remove all these features and keep only features with numeric or integer inputs.
+
+```{r}
+# features including "kurtosis","skewness","max","min","amplitude","avg","stddev","var" in the name were either factorized or NA inputs.
+keys <- c("kurtosis","skewness","max","min","amplitude","avg","stddev","var")
+name_col <- c(1:7)
+for(k in keys){
+    n <- grep(k, names(training), value = F)
+    name_col <- c(name_col, as.integer(n))
+}
+
+# remove first 7 cols and cols including above key strings in their names from original training and testing data
+trains <- training[, -name_col]
+tests <- testing[, -name_col]
+```
+
+Check the dimentions of cleaned training data, trains, and testing data, tests. And now we have only 53 features left for further analysis.
+
+```{r}
+dim(trains)
+dim(tests)
+```
+
+### Data preprocessing
+53 features were still too many for prediction and it seems very likely that many features were correlated with one another. Therefore, I preprocess the 52 features (exclude the "classe" which is our output variable) with principle component analysis (pca). Set up the threshold to catch 90% variance of the original data, 52 featuers were reduced to 19 principle components.
+
+```{r}
+ncols <- dim(trains)[2]
+preProc <- preProcess(trains[,-ncols], method='pca',thresh=0.9)
+preProc
+t.pca <- predict(preProc, trains[,-ncols])
+trains.pca <- cbind(t.pca, trains$classe)
+names(trains.pca)[20] <- "classe"
+test.pca <- predict(preProc, tests[,-ncols])
+```
+
+### Modelfit and Predition on test set
+I used random forest to fit the model. In random forests, there is no need for cross-validation or a separate test set to get an unbiased estimate of the test set error. It is estimated internally during the run.
+```{r}
+fit1 <- train(classe ~., data=trains.pca, method='rf')
+fit1
+```
+
+Use the model fit1 on test.pca to classify the samples. The final estimation of the accuracy of the prediciton would be tested in the submission part of this project.
+
+```{r}
+pred <- predict(fit1, test.pca)
+pred
+```
+
